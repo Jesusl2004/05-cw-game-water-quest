@@ -1,14 +1,29 @@
 // Game configuration and state variables
-const GAME_DURATION = 30;    // Game duration in seconds
-const WINNING_SCORE = 20;    // Minimum score needed to win
+const DIFFICULTIES = {
+  easy: { label: 'Easy', duration: 45, winningScore: 15, spawnInterval: 1200, oilChance: 0.15 },
+  normal: { label: 'Normal', duration: 30, winningScore: 20, spawnInterval: 1000, oilChance: 0.25 },
+  hard: { label: 'Hard', duration: 20, winningScore: 25, spawnInterval: 700, oilChance: 0.35 }
+};
+const MILESTONE_MESSAGES = [
+  { score: 5, message: 'Great start!' },
+  { score: 10, message: 'Halfway there!' },
+  { score: 15, message: 'You are on a roll!' },
+  { score: 20, message: 'Amazing work!' },
+  { score: 25, message: 'Incredible! You reached 25 points!' }
+];
 let currentCans = 0;         // Current number of items collected
 let gameActive = false;      // Tracks if game is currently running
-let remainingTime = GAME_DURATION;
+let selectedDifficulty = 'normal';
+let reachedMilestones = new Set();
+let remainingTime = DIFFICULTIES[selectedDifficulty].duration;
 let spawnInterval;           // Holds the interval for spawning items
 let timerInterval;           // Holds the interval for the game timer
 const timerDisplay = document.getElementById('timer');
 const scoreDisplay = document.getElementById('current-cans');
 const achievementDisplay = document.getElementById('achievements');
+const winningScoreDisplay = document.getElementById('winning-score');
+const difficultyButtons = document.querySelectorAll('.difficulty-button');
+const gameOverSound = document.getElementById('game-over-sound');
 
 function showWinEffect() {
   const splash = document.createElement('div');
@@ -43,18 +58,28 @@ function spawnWaterCan() {
   // Select a random cell from the grid to place the water can
   const randomCell = cells[Math.floor(Math.random() * cells.length)];
 
-  // Spawn either a water can or an oil obstacle
-  randomCell.innerHTML = Math.random() < 0.25
-    ? `
+  // Spawn a water can, bonus storm, or oil obstacle
+  const itemRoll = Math.random();
+  const difficulty = DIFFICULTIES[selectedDifficulty];
+  if (itemRoll < difficulty.oilChance) {
+    randomCell.innerHTML = `
       <div class="water-can-wrapper">
         <div class="oil-obstacle" role="button" aria-label="Oil obstacle">🛢️</div>
       </div>
-    `
-    : `
+    `;
+  } else if (itemRoll < difficulty.oilChance + 0.15) {
+    randomCell.innerHTML = `
+      <div class="water-can-wrapper">
+        <div class="storm-bonus" role="button" aria-label="Storm bonus worth 2 points">🌩️</div>
+      </div>
+    `;
+  } else {
+    randomCell.innerHTML = `
       <div class="water-can-wrapper">
         <div class="water-can"></div>
       </div>
     `;
+  }
 }
 
 // Updates the score when an active item is clicked
@@ -63,25 +88,42 @@ function collectWaterCan(event) {
 
   const clickedCan = event.target.closest('.water-can');
   const clickedOil = event.target.closest('.oil-obstacle');
-  if (!clickedCan && !clickedOil) return;
+  const clickedStorm = event.target.closest('.storm-bonus');
+  if (!clickedCan && !clickedOil && !clickedStorm) return;
 
-  currentCans += clickedCan ? 1 : -2;
+  currentCans += clickedCan ? 1 : clickedStorm ? 2 : -2;
   currentCans = Math.max(0, currentCans);
   scoreDisplay.textContent = currentCans;
+  showMilestoneMessage();
   event.target.closest('.water-can-wrapper').remove();
+}
+
+function showMilestoneMessage() {
+  const reachedMessage = MILESTONE_MESSAGES.find(milestone =>
+    currentCans >= milestone.score && !reachedMilestones.has(milestone.score)
+  );
+
+  if (!reachedMessage) return;
+
+  reachedMilestones.add(reachedMessage.score);
+  achievementDisplay.textContent = reachedMessage.message;
 }
 
 // Initializes and starts a new game
 function startGame() {
   if (gameActive) return; // Prevent starting a new game if one is already active
+  const difficulty = DIFFICULTIES[selectedDifficulty];
   gameActive = true;
   currentCans = 0;
+  reachedMilestones = new Set();
   scoreDisplay.textContent = currentCans;
   achievementDisplay.textContent = '';
-  remainingTime = GAME_DURATION;
+  remainingTime = difficulty.duration;
   timerDisplay.textContent = remainingTime;
+  setDifficultyButtonsDisabled(true);
   createGrid(); // Set up the game grid
-  spawnInterval = setInterval(spawnWaterCan, 1000); // Spawn water cans every second
+  spawnWaterCan();
+  spawnInterval = setInterval(spawnWaterCan, difficulty.spawnInterval);
   timerInterval = setInterval(() => {
     remainingTime -= 1;
     timerDisplay.textContent = remainingTime;
@@ -96,13 +138,19 @@ function endGame() {
   gameActive = false; // Mark the game as inactive
   clearInterval(spawnInterval); // Stop spawning water cans
   clearInterval(timerInterval); // Stop the game timer
-  const playerWon = currentCans >= WINNING_SCORE;
+  setDifficultyButtonsDisabled(false);
+  const playerWon = currentCans >= DIFFICULTIES[selectedDifficulty].winningScore;
   achievementDisplay.textContent = playerWon
     ? 'Yay you won! go drink some water, you earned it!'
     : 'haha you lost try again';
 
   if (playerWon) {
     showWinEffect();
+  } else {
+    gameOverSound.currentTime = 0;
+    gameOverSound.play().catch(() => {
+      achievementDisplay.textContent += ' Sound effect unavailable.';
+    });
   }
 }
 
@@ -112,14 +160,40 @@ function resetGame() {
   clearInterval(spawnInterval);
   clearInterval(timerInterval);
   currentCans = 0;
-  remainingTime = GAME_DURATION;
+  reachedMilestones = new Set();
+  remainingTime = DIFFICULTIES[selectedDifficulty].duration;
   scoreDisplay.textContent = currentCans;
   timerDisplay.textContent = remainingTime;
   achievementDisplay.textContent = '';
+  setDifficultyButtonsDisabled(false);
   createGrid();
+}
+
+function updateDifficulty(difficulty) {
+  if (gameActive || !DIFFICULTIES[difficulty]) return;
+
+  selectedDifficulty = difficulty;
+  const settings = DIFFICULTIES[selectedDifficulty];
+  winningScoreDisplay.textContent = settings.winningScore;
+  remainingTime = settings.duration;
+  timerDisplay.textContent = remainingTime;
+  difficultyButtons.forEach(button => {
+    const isSelected = button.dataset.difficulty === selectedDifficulty;
+    button.classList.toggle('active', isSelected);
+    button.setAttribute('aria-pressed', String(isSelected));
+  });
+}
+
+function setDifficultyButtonsDisabled(disabled) {
+  difficultyButtons.forEach(button => {
+    button.disabled = disabled;
+  });
 }
 
 // Set up click handler for the start button
 document.querySelector('.game-grid').addEventListener('click', collectWaterCan);
 document.getElementById('start-game').addEventListener('click', startGame);
 document.getElementById('reset-game').addEventListener('click', resetGame);
+difficultyButtons.forEach(button => {
+  button.addEventListener('click', () => updateDifficulty(button.dataset.difficulty));
+});

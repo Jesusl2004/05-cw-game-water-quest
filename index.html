@@ -12,7 +12,13 @@
       <img class="brand-logo" src="img/cw_logo_horizontal.png" alt="charity: water" />
       <h1>Water Quest</h1>
     </header>
-    <p class="game-instructions">Collect 20 items to complete the game!</p>
+    <p class="game-instructions">Collect <span id="winning-score">20</span> cans to complete the game!</p>
+    <div class="difficulty-selector" role="group" aria-labelledby="difficulty-label">
+      <span id="difficulty-label" class="difficulty-label">Difficulty:</span>
+      <button class="difficulty-button" type="button" data-difficulty="easy" aria-pressed="false">Easy</button>
+      <button class="difficulty-button active" type="button" data-difficulty="normal" aria-pressed="true">Normal</button>
+      <button class="difficulty-button" type="button" data-difficulty="hard" aria-pressed="false">Hard</button>
+    </div>
     <div class="stats">
       <p>Cans Collected: <span id="current-cans">0</span></p>
       <p>Time Left: <span id="timer">30</span>s</p>
@@ -23,6 +29,17 @@
       <button id="start-game">Start Game</button>
       <button id="reset-game" type="button">Reset</button>
     </div>
+    <footer class="game-footer">
+      <p>Help bring clean water to more people with charity: water.</p>
+      <nav aria-label="charity: water links">
+        <a href="https://www.charitywater.org/" target="_blank" rel="noopener noreferrer">Visit charity: water</a>
+        <a href="https://www.charitywater.org/donate" target="_blank" rel="noopener noreferrer">Donate</a>
+        <a href="https://www.charitywater.org/monthly" target="_blank" rel="noopener noreferrer">Give monthly</a>
+      </nav>
+    </footer>
+    <audio id="game-over-sound" preload="auto">
+      <source src="audio/Salphix-game-over-417465.mp3" type="audio/mpeg" />
+    </audio>
   </div>
   <script src="script.js"></script>
 </body>
